@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { Client, Events, GatewayIntentBits, MessageFlags, Options, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ApplicationIntegrationType, Client, Events, GatewayIntentBits, InteractionContextType, MessageFlags, Options, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { errorReply, generateReply, splitReply } from './chat.js';
 import { MemoryStore, memoryScope, speakerText } from './memory.js';
 import { BotDialogue } from './bot-dialogue.js';
+import { DialogueChannelError, resolveDialogueChannel, resolveDialoguePartner } from './dialogue-channel.js';
 
 // DisHost's quick settings save secrets in .env rather than injecting them.
 // Existing process environment values take precedence over file values.
@@ -55,6 +56,7 @@ const commands = [
       .addIntegerOption(option => option.setName('번호').setDescription('보기에서 확인한 메모 번호').setRequired(true).setMinValue(1))),
   new SlashCommandBuilder().setName('상태').setDescription('봇 상태와 사용법을 확인해요.'),
   new SlashCommandBuilder().setName('봇대화').setDescription('리메와 최대 3왕복 대화해요.')
+    .setContexts(InteractionContextType.Guild).setIntegrationTypes(ApplicationIntegrationType.GuildInstall)
     .addSubcommand(sub => sub.setName('시작').setDescription('리메와 대화를 시작해요 (최대 3왕복).')
       .addStringOption(option => option.setName('주제').setDescription('함께 이야기할 주제').setRequired(true).setMaxLength(1000)))
     .addSubcommand(sub => sub.setName('중지').setDescription('이 채널의 봇 대화를 멈춰요.')),
@@ -67,6 +69,7 @@ sweep.unref();
 
 client.once(Events.ClientReady, async ready => {
   console.log(`Discord ready: ${ready.user.tag}; model=${model}`);
+  console.log(`Guild connections: ${ready.guilds.cache.size}; application=${ready.application.id}`);
   try {
     // Upsert only this bot's commands; preserve unrelated commands.
     for (const command of commands) await ready.application.commands.create(command);
@@ -105,7 +108,10 @@ client.on(Events.InteractionCreate, async interaction => {
   const privateReply = content => interaction.reply({ content, flags: MessageFlags.Ephemeral });
   try {
     if (interaction.commandName === '봇대화') {
-      if (!interaction.guildId || !interaction.channel?.isTextBased()) { await privateReply('서버의 텍스트 채널에서 사용해줘.'); return; }
+      if (!interaction.guildId) {
+        console.log('Bot dialogue rejected: GUILD_ONLY');
+        await privateReply('봇 대화는 DM이 아닌 Discord 서버 채널에서 시작해줘. 티라미슈와 리메가 그 서버에 모두 있어야 해.'); return;
+      }
       if (interaction.options.getSubcommand() === '중지') {
         const result = dialogues.stop(interaction.channelId, actor, admin);
         await privateReply(result === 'forbidden' ? '시작한 사람이나 서버 관리자만 멈출 수 있어.' : result === 'missing' ? '이 채널에서 진행 중인 봇 대화는 없어.' : '중지 요청을 반영했어.');
@@ -117,11 +123,21 @@ client.on(Events.InteractionCreate, async interaction => {
       if (Date.now() - (cooldown.get(botRateKey) ?? 0) < 60_000) { await privateReply('봇 대화 시작은 1분에 한 번만 가능해.'); return; }
       const topic = interaction.options.getString('주제', true).trim();
       if (!topic) { await privateReply('대화 주제를 적어줘.'); return; }
-      cooldown.set(botRateKey, Date.now());
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      const partner = await client.users.fetch(partnerId);
+      let channel, partner;
+      try {
+        channel = await resolveDialogueChannel(interaction);
+        partner = await resolveDialoguePartner(channel, partnerId);
+      }
+      catch (error) {
+        if (!(error instanceof DialogueChannelError)) throw error;
+        console.log(`Bot dialogue channel rejected: ${error.code}; cached=${!!interaction.channel}`);
+        await interaction.editReply(error.publicMessage);
+        return;
+      }
       if (!partner.bot || partner.id === client.user.id) { await interaction.editReply('설정된 상대가 다른 봇인지 확인해야 해.'); return; }
-      await dialogues.start({ channelId: interaction.channelId, channel: interaction.channel, targetId: partner.id,
+      cooldown.set(botRateKey, Date.now());
+      await dialogues.start({ channelId: interaction.channelId, channel, targetId: partner.id,
         targetName: partner.username, initiatorId: actor, topic, interaction });
       await interaction.editReply('리메에게 말을 걸었어. 최대 3왕복 후 자동으로 멈추고, 90초간 응답이 없어도 종료해.');
       return;
