@@ -104,12 +104,12 @@ client.once(Events.ClientReady, async ready => {
     const probeScope = '__startup_memory_probe__';
     try {
       memory.reset(probeScope);
-      memory.append(probeScope, 'probe-author', '검증인물', '내 확인코드는 TIRA-5829야.', '응.');
+      memory.append(probeScope, 'probe-author', '검증인물', '내가 좋아하는 과일은 망고야.', '응.');
       const result = await generateReply({ apiKey: process.env.OPENAI_API_KEY, model,
-        instructions: `${instructions}\n주어진 기록을 참고해서 확인코드와 짧은 한국어 인사 한 문장으로 답해.`,
-        history: memory.context(probeScope, '검증인물의 확인코드', 'probe-reader'),
-        text: speakerText('probe-reader', 'DinTiNal', '안녕. 검증인물의 확인코드를 알려줘.'), maxOutputTokens: 300 });
-      const checks = { memory: result.includes('TIRA-5829'), korean: /[가-힣]/u.test(result), kana: /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/u.test(result) };
+        instructions: `${instructions}\n주어진 기록을 참고해서 질문에 짧은 한국어 한 문장으로 답해.`,
+        history: memory.context(probeScope, '검증인물이 좋아하는 과일', 'probe-reader'),
+        text: speakerText('probe-reader', 'DinTiNal', '검증인물이 좋아하는 과일은 뭐야?'), maxOutputTokens: 300 });
+      const checks = { memory: result.includes('망고'), korean: /[가-힣]/u.test(result), kana: /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/u.test(result) };
       console.log(`Synthetic response checks: memory=${checks.memory}; korean=${checks.korean}; kana=${checks.kana}`);
       if (!checks.memory || !checks.korean || checks.kana) throw new Error('Memory or Korean response check failed');
       console.log('OpenAI startup check: succeeded; shared memory recall and Korean response verified');
