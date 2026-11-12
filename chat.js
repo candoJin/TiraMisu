@@ -3,12 +3,12 @@ export function extractText(response) {
     .filter(item => item.type === 'output_text').map(item => item.text).join('\n').trim();
 }
 
-export async function generateReply({ apiKey, model, instructions, history, text, fetchImpl = fetch }) {
+export async function generateReply({ apiKey, model, instructions, history, text, maxOutputTokens = 1200, fetchImpl = fetch }) {
   const response = await fetchImpl('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey.trim()}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(60_000),
-    body: JSON.stringify({ model, instructions, input: [...history, { role: 'user', content: text }], max_output_tokens: 1200, store: false }),
+    body: JSON.stringify({ model, instructions, input: [...history, { role: 'user', content: text }], reasoning: { effort: 'none' }, max_output_tokens: maxOutputTokens, store: false }),
   });
   if (!response.ok) {
     // Keep only documented machine codes; never expose provider messages or bodies.

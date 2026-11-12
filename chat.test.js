@@ -20,6 +20,7 @@ test('Responses payload keeps persona separate and disables stored responses', a
   assert.equal(request.body.model, 'chosen-model');
   assert.equal(request.body.instructions, 'persona');
   assert.equal(request.body.store, false);
+  assert.deepEqual(request.body.reasoning, { effort: 'none' });
   assert.deepEqual(request.body.input, [{ role: 'user', content: 'earlier' }, { role: 'user', content: 'hello' }]);
 });
 
