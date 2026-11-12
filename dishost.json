@@ -1,0 +1,6 @@
+{
+  "name": "tiramisu",
+  "language": "javascript",
+  "entrypoint": "index.js",
+  "env": {}
+}
