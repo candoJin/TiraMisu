@@ -6,7 +6,7 @@
 
 Node.js 22.12 이상에서 `npm install` 후 `npm start`. 토큰을 소스에 넣지 않는다.
 
-DisHost 대시보드에서 대상 봇의 환경변수에 `DISCORD_TOKEN`과 `OPENAI_API_KEY`를 등록한다. 에이전트가 보안 입력으로 값을 받은 경우 연결된 `dishost` MCP의 `set_env`로 등록한다. 선택 변수 `OPENAI_MODEL`로 모델을 지정할 수 있다. `dishost.json`의 `env`는 시크릿을 담지 않는다.
+DisHost 대시보드에서 대상 봇의 간편 설정 → 환경변수 (.env) 설정에 `DISCORD_TOKEN`과 `OPENAI_API_KEY`를 등록하고 저장한다. 시작 코드는 프로젝트 루트의 `.env`를 읽으며, 실행 환경에 이미 설정된 값이 우선한다. 에이전트가 보안 입력으로 값을 받은 경우 연결된 `dishost` MCP의 `set_env`로 등록한다. 선택 변수 `OPENAI_MODEL`로 모델을 지정할 수 있다. `dishost.json`의 `env`는 시크릿을 담지 않는다. `.env`는 Git에 올리지 않는다.
 
 Discord 초대 시 `bot`, `applications.commands` scope와 채널 보기·메시지 보내기 권한이 필요하다. `/대화 내용:`, `/초기화`, `/상태`를 사용한다. Message Content Intent는 사용하지 않는다. 대화 명령의 응답은 채널에 공개된다.
 

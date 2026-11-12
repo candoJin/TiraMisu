@@ -1,6 +1,16 @@
 import { readFileSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { Client, Events, GatewayIntentBits, MessageFlags, Options, SlashCommandBuilder } from 'discord.js';
 import { generateReply, splitReply } from './chat.js';
+
+// DisHost's quick settings save secrets in .env rather than injecting them.
+// Existing process environment values take precedence over file values.
+try {
+  loadEnvFile(fileURLToPath(new URL('./.env', import.meta.url)));
+} catch (error) {
+  if (error.code !== 'ENOENT') { console.error('Cannot read .env configuration'); process.exit(1); }
+}
 
 const required = ['DISCORD_TOKEN', 'OPENAI_API_KEY'];
 const missing = required.filter(key => !process.env[key]?.trim());
