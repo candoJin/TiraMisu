@@ -95,4 +95,10 @@ client.on(Events.ShardReconnecting, () => console.log('Discord reconnecting'));
 client.on(Events.ShardResume, () => console.log('Discord connection resumed'));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { client.destroy(); process.exit(0); });
 process.on('unhandledRejection', () => { console.error('Unhandled rejection; stopping for supervisor restart'); client.destroy(); process.exit(1); });
-client.login(process.env.DISCORD_TOKEN).catch(() => { console.error('Discord login failed; check token and network'); process.exit(1); });
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+  const knownCodes = ['TokenInvalid', 'DisallowedIntents', 'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNREFUSED', 'UND_ERR_CONNECT_TIMEOUT'];
+  const code = knownCodes.includes(error.code) ? error.code : 'unknown';
+  const status = Number.isInteger(error.status) ? error.status : 'unknown';
+  console.error(`Discord login failed: code=${code}; status=${status}`);
+  process.exit(1);
+});
