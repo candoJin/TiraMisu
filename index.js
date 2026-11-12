@@ -108,11 +108,14 @@ client.once(Events.ClientReady, async ready => {
       const result = await generateReply({ apiKey: process.env.OPENAI_API_KEY, model,
         instructions: `${instructions}\n주어진 기록을 참고해서 확인코드와 짧은 한국어 인사 한 문장으로 답해.`,
         history: memory.context(probeScope, '검증인물의 확인코드', 'probe-reader'),
-        text: speakerText('probe-reader', 'DinTiNal', '안녕. 검증인물의 확인코드를 알려줘.'), maxOutputTokens: 100 });
-      if (!result.includes('TIRA-5829') || !/[가-힣]/u.test(result) || /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/u.test(result)) throw new Error('Memory or Korean response check failed');
+        text: speakerText('probe-reader', 'DinTiNal', '안녕. 검증인물의 확인코드를 알려줘.'), maxOutputTokens: 300 });
+      const checks = { memory: result.includes('TIRA-5829'), korean: /[가-힣]/u.test(result), kana: /[\u3040-\u30ff\u31f0-\u31ff\uff66-\uff9f]/u.test(result) };
+      console.log(`Synthetic response checks: memory=${checks.memory}; korean=${checks.korean}; kana=${checks.kana}`);
+      if (!checks.memory || !checks.korean || checks.kana) throw new Error('Memory or Korean response check failed');
       console.log('OpenAI startup check: succeeded; shared memory recall and Korean response verified');
     } catch (error) {
-      console.error(`OpenAI startup check: failed; status=${Number(error.status) || 'unknown'}; code=${error.provider === 'openai' ? error.code : 'unknown'}`);
+      const diagnostic = new Map([['Incomplete model response', 'incomplete_output'], ['Empty model response', 'empty_output'], ['Memory or Korean response check failed', 'response_check_failed']]);
+      console.error(`OpenAI startup check: failed; status=${Number(error.status) || 'unknown'}; code=${error.provider === 'openai' ? error.code : diagnostic.get(error.message) || 'unknown'}`);
     } finally { memory.reset(probeScope); }
   }
 });
