@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { Client, Events, GatewayIntentBits, MessageFlags, Options, SlashCommandBuilder } from 'discord.js';
-import { generateReply, splitReply } from './chat.js';
+import { errorReply, generateReply, splitReply } from './chat.js';
 
 // DisHost's quick settings save secrets in .env rather than injecting them.
 // Existing process environment values take precedence over file values.
@@ -45,7 +45,16 @@ client.once(Events.ClientReady, async ready => {
     // Upsert only this bot's commands; preserve unrelated commands.
     for (const command of commands) await ready.application.commands.create(command);
     console.log('Slash commands registered: 대화, 초기화, 상태');
-  } catch { console.error('Slash command registration failed'); process.exitCode = 1; client.destroy(); }
+  } catch { console.error('Slash command registration failed'); process.exitCode = 1; client.destroy(); return; }
+  // Enable only during diagnosis: one real, short API request per startup, no retries.
+  if (process.env.OPENAI_STARTUP_CHECK === '1') {
+    try {
+      await generateReply({ apiKey: process.env.OPENAI_API_KEY, model, instructions: 'Reply with OK only.', history: [], text: 'Connection check' });
+      console.log('OpenAI startup check: succeeded');
+    } catch (error) {
+      console.error(`OpenAI startup check: failed; status=${Number(error.status) || 'unknown'}; code=${error.provider === 'openai' ? error.code : 'unknown'}`);
+    }
+  }
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -82,8 +91,8 @@ client.on(Events.InteractionCreate, async interaction => {
       sessions.set(key, { updated: Date.now(), history: [...history, { role: 'user', content: text }, { role: 'assistant', content: reply.slice(0, 6000) }].slice(-12) });
     } finally { busy.delete(key); }
   } catch (error) {
-    console.error(`Interaction failed: status=${Number(error.status) || 'unknown'}; type=${error.name}`);
-    const content = '지금 답변을 가져오지 못했어. 잠깐 뒤에 다시 말해줘.';
+    console.error(`Interaction failed: status=${Number(error.status) || 'unknown'}; provider=${error.provider === 'openai' ? 'openai' : 'other'}; code=${error.provider === 'openai' ? error.code : 'unknown'}`);
+    const content = errorReply(error);
     try {
       if (interaction.deferred || interaction.replied) await interaction.editReply({ content });
       else await privateReply(content);
